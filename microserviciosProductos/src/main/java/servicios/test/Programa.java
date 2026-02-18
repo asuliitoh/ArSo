@@ -1,6 +1,7 @@
 package servicios.test; // O 'dominio' si prefieres
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -8,11 +9,8 @@ import java.util.Optional;
 import dominio.Categoria;
 import dominio.EstadoProducto;
 import dominio.Producto;
-import dominio.Usuario;
 import repositorios.EntidadNoEncontrada;
-import repositorios.FactoriaRepositorios;
 import repositorios.RepositorioException;
-import repositorios.RepositorioUsuariosJPA;
 import servicios.FactoriaServicios;
 import servicios.IServicioCategorias;
 import servicios.IServicioProductos;
@@ -26,12 +24,9 @@ public class Programa {
 	private static IServicioCategorias servicioCategorias = FactoriaServicios.getServicio(IServicioCategorias.class);
 	private static IServicioProductos servicioProductos = FactoriaServicios.getServicio(IServicioProductos.class);
 
-
-	private static String idAdmin = null;
 	private static String idUser = null;
 	private static String idProducto1 = null;
 	
-
 	private static String idCategoriaRaiz = "8"; // "Arte y ocio"
 	private static String idSubCategoria = "5709"; // "Fiestas y celebraciones"
 
@@ -40,6 +35,7 @@ public class Programa {
 		System.out.println("--- INICIO DE PRUEBAS DE SERVICIOS SEGNDUM ---");
 
 		try {
+			inicializarUsuarios();
 			probarServicioCategorias(); 
 			probarServicioProductos();
 
@@ -50,21 +46,30 @@ public class Programa {
 
 		System.out.println("--- FIN DE TODAS LAS PRUEBAS ---");
 	}
+	
+	private static void inicializarUsuarios() {
+		
+		List<String> nombres = List.of("Pepe", "Juan", "Marcos");
+		List<String> apellidos = List.of("Fernandez", "Hidalgo", "Cuesta");
+		List<String> correos = List.of("pepe.fernandez@um.es", "juan.hidalgo@um.es", "marcos.cuesta@um.es");
+		
+		for (int i = 0; i < 3; i++) {
+			Optional<String> id = servicioUsuarios.registrarUsuario(nombres.get(i), apellidos.get(i), correos.get(i));
+			if (id.isEmpty()) System.out.println("Prueba FALLIDA: No se pudo registrar el Usuario " + (i+1));
+			else idUser = id.get();
+		}
+	}
 
 
 
 	private static void probarServicioCategorias() throws RepositorioException, EntidadNoEncontrada {
 		System.out.println("\n--- Probando ServicioCategorias ---");
 		
-		if (idAdmin == null || idUser == null) {
-			System.out.println("Prueba OMITIDA: Se requieren los IDs de usuario de la prueba anterior.");
-			return;
-		}
-
-		// 1. Cargar TODAS las jerarquías de categorías (con admin)
-		System.out.println("Cargando todas las categorías desde el directorio del usuario con ADMIN (" + idAdmin + ")...");
 		
 
+		// 1. Cargar TODAS las jerarquías de categorías
+		System.out.println("Cargando todas las categorías desde el directorio del usuario con ID " + idUser + "...");
+		
 		String baseDir = "categoriasXML/";
 
 		String[] archivosCategorias = {
@@ -91,30 +96,21 @@ public class Programa {
 		// 2. Intentar cargar de nuevo (debe fallar)
 		System.out.println("Intentando cargar de nuevo 'Arte_y_ocio.xml' (debe fallar)...");
 		String rutaDuplicada = baseDir + java.io.File.separator + "Arte_y_ocio.xml";
-		boolean cargadas = servicioCategorias.cargarCategorias(rutaDuplicada, idAdmin);
+		boolean cargadas = servicioCategorias.cargarCategorias(rutaDuplicada, idUser);
 		if (!cargadas) {
 			System.out.println("Prueba exitosa: No se cargaron categorías duplicadas.");
 		} else {
 			System.out.println("Prueba FALLIDA: Se cargaron categorías duplicadas.");
 		}
 
-		// 3. Modificar una categoría (con admin)
+		// 3. Modificar una categoría
 		String desc = "Descripción de prueba para Arte y Ocio";
 		System.out.println("Modificando categoría " + idCategoriaRaiz + " con ADMIN...");
-		boolean modificada = servicioCategorias.modificarCategoria(idCategoriaRaiz, desc, idAdmin);
+		boolean modificada = servicioCategorias.modificarCategoria(idCategoriaRaiz, desc, idUser);
 		if (modificada) {
 			System.out.println("Categoría MODIFICADA.");
 		} else {
 			System.out.println("Prueba FALLIDA: Admin no pudo modificar la categoría " + idCategoriaRaiz);
-		}
-
-		// 4. Modificar una categoría (con user normal - debe fallar)
-		System.out.println("Intentando modificar categoría " + idCategoriaRaiz + " con USER (debe fallar)...");
-		modificada = servicioCategorias.modificarCategoria(idCategoriaRaiz, "Intento fallido", idUser);
-		if (!modificada) {
-			System.out.println("Prueba exitosa: Usuario normal NO pudo modificar la categoría.");
-		} else {
-			System.out.println("Prueba FALLIDA: Usuario normal SÍ pudo modificar la categoría.");
 		}
 		
 		// 5. Recuperar categorías raíz
@@ -147,11 +143,6 @@ public class Programa {
 	private static void probarServicioProductos() throws RepositorioException, EntidadNoEncontrada {
 		System.out.println("\n--- Probando ServicioProductos ---");
 		
-		if (idUser == null) {
-			System.out.println("Prueba OMITIDA: Se requiere el ID de usuario de la prueba anterior.");
-			return;
-		}
-
 		// 1. Alta de un producto (en subcategoría)
 		System.out.println("Registrando Producto 1 (en subcategoría " + idSubCategoria + ")...");
 		Optional<String> idProducto1Opt = servicioProductos.registrarProducto(
